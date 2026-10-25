@@ -31,6 +31,12 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+import sys as _sys
+
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+_sys.modules.pop("_feiyu_kit", None)  # 顶层模块名，重载插件时先清缓存再导，避免用到旧字节
+import _feiyu_kit as kit  # noqa: E402
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
@@ -408,18 +414,17 @@ class FeiyuExplore(Star):
         if not key:
             logger.warning("[feiyu_explore] 没配 search_key，搜不了")
             return []
-        api = str(self.cfg.get("search_api") or DEFAULT_CONFIG["search_api"])
-        payload = json.dumps({"query": query[:120], "count": count, "need_content": need_content}).encode()
-        req = urllib.request.Request(api, data=payload, headers={
-            "Content-Type": "application/json", "Authorization": "Bearer " + key,
-        })
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         try:
-            data = json.loads(opener.open(req, timeout=40).read())
+            hits = kit.deepseek_search(query[:120], count=count, need_content=need_content,
+                                            key=key, api=str(self.cfg.get("search_api") or ""))
         except Exception as e:
-            logger.warning(f"[feiyu_explore] 搜索失败: {e}")
+            logger.warning(f"[feiyu_explore] 搜索失败: {kit.user_hint(e)}")
             return []
-        return [r for r in (data.get("results") or []) if isinstance(r, dict)]
+        return [{
+            "title": h.get("title", ""), "url": h.get("url", ""),
+            "site_name": h.get("site", ""), "date": h.get("date", ""),
+            "summary": h.get("summary", ""),
+        } for h in hits]
 
     def _fetch_text(self, url: str) -> str:
         try:
@@ -455,65 +460,35 @@ class FeiyuExplore(Star):
             return "ffmpeg"
 
     def _download_video(self, url: str) -> str:
-        out = os.path.join(tempfile.gettempdir(), f"feiyu_explore_{uuid.uuid4().hex[:8]}.mp4")
-        mb = int(self.cfg.get("max_filesize_mb") or 80)
-        secs = int(self.cfg.get("video_max_seconds") or 180)
-        cmd = [
-            self._yt_dlp(), "--no-warnings", "--no-playlist", "--no-progress",
-            "-f", "worstvideo[height<=360]/worstvideo/worst/bv*/b",
-            # 只下前 N 秒：一条两小时的纪录片也只要几 MB，不整片拖
-            "--download-sections", f"*0-{secs}",
-            "--max-filesize", f"{mb}M",
-            "--ffmpeg-location", self._ffmpeg(),
-            "-o", out, url,
-        ]
+        out = Path(tempfile.gettempdir()) / f"feiyu_explore_{uuid.uuid4().hex[:8]}.mp4"
         try:
-            p = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
-                               errors="replace", timeout=int(self.cfg.get("timeout") or 180),
-                               creationflags=SUBPROCESS_FLAGS)
+            got = kit.ytdlp_download(
+                url, out,
+                seconds=int(self.cfg.get("video_max_seconds") or 180),
+                height=360,
+                ytdlp=self._yt_dlp(),
+                ffmpeg=self._ffmpeg(),
+                timeout=int(self.cfg.get("timeout") or 180),
+            )
+            return str(got)
         except Exception as e:
-            logger.warning(f"[feiyu_explore] 下载视频失败: {e}")
+            logger.warning(f"[feiyu_explore] 下载视频失败: {kit.user_hint(e)}")
             return ""
-        if not os.path.exists(out) or os.path.getsize(out) < 10000:
-            logger.warning(f"[feiyu_explore] 视频没下下来: {(p.stderr or '')[-200:]}")
-            return ""
-        return out
 
     def _duration(self, path: str) -> float:
-        try:
-            p = subprocess.run([self._ffmpeg(), "-i", path], capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=60,
-                               creationflags=SUBPROCESS_FLAGS)
-            m = re.search(r"Duration:\s*(\d+):(\d+):(\d+\.\d+)", p.stderr or "")
-            if m:
-                h, mi, s = m.groups()
-                return int(h) * 3600 + int(mi) * 60 + float(s)
-        except Exception as e:
-            logger.warning(f"[feiyu_explore] 读时长失败: {e}")
-        return 0.0
+        return kit.video_duration(Path(path))
 
     def _frames(self, path: str) -> list[str]:
         span = self._duration(path) or 30.0
         span = min(span, float(self.cfg.get("video_max_seconds") or 180))
-        n = max(1, int(self.cfg.get("frames") or 5))
-        width = int(self.cfg.get("frame_width") or 640)
         outdir = self.data_dir / "frames" / uuid.uuid4().hex[:8]
-        outdir.mkdir(parents=True, exist_ok=True)
-        frames: list[str] = []
-        for i in range(n):
-            t = max(0.3, span * (i + 0.5) / n)
-            out = outdir / f"f{i}.jpg"
-            try:
-                subprocess.run(
-                    [self._ffmpeg(), "-y", "-ss", f"{t:.2f}", "-i", path, "-frames:v", "1",
-                     "-vf", f"scale={width}:-2", str(out)],
-                    capture_output=True, timeout=60, creationflags=SUBPROCESS_FLAGS,
-                )
-                if out.exists() and out.stat().st_size > 0:
-                    frames.append(str(out))
-            except Exception as e:
-                logger.warning(f"[feiyu_explore] 抽帧失败 t={t}: {e}")
-        return frames
+        shots = kit.extract_frames(
+            Path(path), outdir,
+            count=max(1, int(self.cfg.get("frames") or 5)),
+            width=int(self.cfg.get("frame_width") or 640),
+            span=span,
+        )
+        return [str(s) for s in shots]
 
     # ---------- 模型调用 ----------
 
