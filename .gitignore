@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.bak
+*.bak_*
+*.bak-*
+.venv/
+state.json
+.data/

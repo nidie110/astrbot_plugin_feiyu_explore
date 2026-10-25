@@ -1,0 +1,14 @@
+name: astrbot_plugin_feiyu_explore
+display_name: "大肥鱼·自己找乐子"
+desc: "到点自己去网上看点东西：搜B站看视频、翻文章、凭记忆想事，看完写进日记素材池"
+help: "指令：/探索（立刻来一次）、/探索状态、/探索开、/探索关；默认每天 08:30 / 14:00 / 21:00 各一次"
+version: 1.0.0
+author: "部署助手"
+repo: "https://github.com/nidie110/astrbot_plugin_feiyu_explore"
+astrbot_version: ">=4.11.0"
+tags:
+  - 人格
+  - 日记
+  - 自主
+  - 视频
+  - 搜索

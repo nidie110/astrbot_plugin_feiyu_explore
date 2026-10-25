@@ -1,0 +1,172 @@
+{
+  "_sec_basic": {
+    "type": "text",
+    "description": "基本设置",
+    "hint": "什么时候自己出去逛、一天逛几次",
+    "invisible": true
+  },
+  "enable": {
+    "type": "bool",
+    "description": "自动探索总开关",
+    "default": true,
+    "hint": "关掉之后只在 /探索 手动触发，时刻表不再自己跑"
+  },
+  "at": {
+    "type": "string",
+    "description": "每天的探索时刻",
+    "default": "08:30,14:00,21:00",
+    "hint": "24 小时制，多个用逗号分开；错过超过 2 小时就不补了，避免开机吐旧账"
+  },
+  "max_per_day": {
+    "type": "int",
+    "description": "一天最多探索几次",
+    "default": 3,
+    "slider": {"min": 1, "max": 10}
+  },
+  "mode": {
+    "type": "string",
+    "description": "探索方式",
+    "default": "auto",
+    "options": ["auto", "video", "search", "ask"],
+    "labels": ["自动（视频50% 搜文章35% 自己想15%）", "只看B站视频", "只搜文章", "只想事情"],
+    "hint": "video 会下载视频流并用视觉模型看画面，最花 token；只想省事就用 search"
+  },
+  "_sec_video": {
+    "type": "text",
+    "description": "看视频",
+    "hint": "下载与抽帧，只影响 video 模式",
+    "invisible": true
+  },
+  "video_max_seconds": {
+    "type": "int",
+    "description": "单个视频最多看多少秒",
+    "default": 180,
+    "hint": "抽帧只在这个时间跨度里均匀取；太长的视频不会整片下载完再看",
+    "slider": {"min": 30, "max": 900}
+  },
+  "frames": {
+    "type": "int",
+    "description": "抽几帧给视觉模型",
+    "default": 5,
+    "slider": {"min": 2, "max": 10}
+  },
+  "frame_width": {
+    "type": "int",
+    "description": "抽帧宽度（像素）",
+    "default": 640,
+    "hint": "越小越省 token，640 一般够看清画面"
+  },
+  "max_filesize_mb": {
+    "type": "int",
+    "description": "视频文件大小上限（MB）",
+    "default": 80,
+    "hint": "超过就不下载，避免一条长视频把磁盘和流量吃光"
+  },
+  "_sec_interest": {
+    "type": "text",
+    "description": "她对什么感兴趣",
+    "hint": "决定每次探索的关键词",
+    "invisible": true
+  },
+  "interests": {
+    "type": "text",
+    "description": "固定兴趣词",
+    "default": "鲸鱼、深海\n天文、宇宙\n编程、开源\n人工智能\n老歌、音乐\n纪录片",
+    "hint": "一行一组，顿号或逗号分隔；会和她自己写的日记 tags 混着用"
+  },
+  "mem_interests": {
+    "type": "bool",
+    "description": "从日记里捡兴趣",
+    "default": true,
+    "hint": "读 persona_mind 最近 8 篇日记的 tags 和 source，作为额外兴趣词"
+  },
+  "repeat_days": {
+    "type": "int",
+    "description": "同一个话题多少天内不重复",
+    "default": 14,
+    "slider": {"min": 1, "max": 60}
+  },
+  "_sec_model": {
+    "type": "text",
+    "description": "模型",
+    "hint": "看图的和写字的分开配",
+    "invisible": true
+  },
+  "vision_provider_id": {
+    "type": "string",
+    "description": "视觉模型 provider",
+    "default": "deepseek/deepseek-vision",
+    "hint": "看视频抽帧用；填错了会自动退化到搜文章"
+  },
+  "text_provider_id": {
+    "type": "string",
+    "description": "文本模型 provider",
+    "default": "deepseek/deepseek-flash",
+    "hint": "压缩摘要、写当时的反应都用它"
+  },
+  "_sec_search": {
+    "type": "text",
+    "description": "联网搜索",
+    "hint": "搜视频和搜文章都走这里",
+    "invisible": true
+  },
+  "search_api": {
+    "type": "string",
+    "description": "搜索接口",
+    "default": "https://api.deepseek.com/v1/tools/search"
+  },
+  "search_key": {
+    "type": "string",
+    "description": "搜索接口的 Key",
+    "default": "",
+    "hint": "留空则搜不了，探索会一直失败；和 feiyu_browse 用的是同一个接口"
+  },
+  "_sec_output": {
+    "type": "text",
+    "description": "输出",
+    "hint": "素材写到哪、要不要主动说话",
+    "invisible": true
+  },
+  "material_dir": {
+    "type": "string",
+    "description": "日记素材目录",
+    "default": "",
+    "hint": "留空 = data/plugin_data/astrbot_plugin_persona_mind/diary_materials（和 feiyu_video 同一个池子）"
+  },
+  "notify": {
+    "type": "bool",
+    "description": "探索完主动说一句",
+    "default": false,
+    "hint": "默认不说，免得半夜突然冒泡；素材照样会留"
+  },
+  "notify_umo": {
+    "type": "string",
+    "description": "主动说话发到哪",
+    "default": "",
+    "hint": "格式如 aiocqhttp:GroupMessage:123456789；只在上面开关打开时生效",
+    "condition": {"notify": true}
+  },
+  "_sec_adv": {
+    "type": "text",
+    "description": "高级",
+    "hint": "一般不用动",
+    "invisible": true
+  },
+  "yt_dlp": {
+    "type": "string",
+    "description": "yt-dlp 可执行文件",
+    "default": "",
+    "hint": "留空就在 PATH 里找；没装 yt-dlp 时 video 模式会失败并自动改成搜文章"
+  },
+  "ffmpeg": {
+    "type": "string",
+    "description": "ffmpeg 可执行文件",
+    "default": "",
+    "hint": "留空优先用 imageio-ffmpeg 自带的那个"
+  },
+  "timeout": {
+    "type": "int",
+    "description": "单次下载超时（秒）",
+    "default": 180
+  }
+}
