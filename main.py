@@ -34,8 +34,18 @@ from pathlib import Path
 import sys as _sys
 
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
-_sys.modules.pop("_feiyu_kit", None)  # 顶层模块名，重载插件时先清缓存再导，避免用到旧字节
-import _feiyu_kit as kit  # noqa: E402
+_KIT_PATH = Path(__file__).resolve().parent / "_feiyu_kit.py"
+kit = _sys.modules.get("_feiyu_kit")
+if kit is None:
+    # 全进程只有一份 kit：动作注册表必须共享，所以谁先加载谁就是那份，后来者直接复用。
+    # 磁盘上的 kit 改动要重启整个 AstrBot 进程才生效（面板重载插件不会换掉已经加载的模块）。
+    import importlib.util as _ilu  # noqa: PLC0415
+
+    _spec = _ilu.spec_from_file_location("_feiyu_kit", _KIT_PATH)
+    _fresh = _ilu.module_from_spec(_spec)
+    _sys.modules["_feiyu_kit"] = _fresh
+    _spec.loader.exec_module(_fresh)
+    kit = _fresh
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
@@ -119,6 +129,7 @@ class FeiyuExplore(Star):
 
     def __init__(self, context: Context, config: dict | None = None):
         super().__init__(context)
+        kit.register_capability("feiyu_explore", "会自己找乐子——到点上网看视频、翻文章、想事情，记进日记素材", "all")
         self.data_dir = Path("data/plugin_data") / PLUGIN_NAME
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.cfg_path = self.data_dir / "config.json"
@@ -401,7 +412,8 @@ class FeiyuExplore(Star):
 
     async def _notify(self, rec: dict) -> None:
         try:
-            from astrbot.api.message_components import MessageChain, Plain
+            from astrbot.api.event import MessageChain
+            from astrbot.api.message_components import Plain
             line = rec.get("text") or f"我刚看了个视频《{rec.get('title')}》"
             await self.context.send_message(self.cfg.get("notify_umo"), MessageChain([Plain(text=line[:300])]))
         except Exception as e:
